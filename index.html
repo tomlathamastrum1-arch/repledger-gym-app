@@ -524,6 +524,408 @@ document.head.appendChild(v6Styles);
 /* END VERSION 0.6 */
 
 draw();
+ 
+/* REPLEDGER PROFESSIONAL EXERCISE STUDIO */
+
+const exerciseStudio = {
+  exercises: new Map(),
+  status: "loading",
+  animations: {},
+  gender: "male"
+};
+
+const studioNames = {
+  "Dumbbell Curl": "bicep-curl",
+  "Incline Dumbbell Curl": "incline-db-curl",
+  "Front Squat": "front-squat",
+  "Pull-Up": "pull-up",
+  "Reverse-Grip Lat Pulldown": "reverse-grip-lat-pulldown",
+  "Ab Wheel Rollout": "ab-wheel-rollout",
+  "Rowing Machine": "rowing-machine",
+  "Thruster": "thruster",
+  "Mountain Climber": "mountain-climbers",
+  "Machine Chest Fly": "machine-chest-fly",
+  "Barbell Reverse Lunge": "barbell-reverse-lunge",
+  "Smith Machine Front Squat": "smith-machine-front-squat"
+};
+
+const studioNormalize = name =>
+  String(name || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+
+const studioEscape = value =>
+  String(value || "").replace(/[&<>"']/g, character => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#39;"
+  }[character]));
+
+function studioFind(name) {
+  return exerciseStudio.exercises.get(
+    studioNormalize(name)
+  );
+}
+
+function studioImage(path) {
+  if (
+    typeof path !== "string" ||
+    !/^images\/flat\/[a-z0-9/-]+\.webp$/i.test(path)
+  ) {
+    return "";
+  }
+
+  return "https://cdn.jsdelivr.net/gh/RepDB/exercise-dataset@main/" + path;
+}
+
+function studioAnimation(name) {
+  const slug = studioNames[name];
+
+  if (!slug) return "";
+
+  const available = exerciseStudio.animations[slug];
+
+  if (!available) return "";
+
+  const path =
+    available[exerciseStudio.gender] ||
+    available.male ||
+    available.female;
+
+  if (
+    typeof path !== "string" ||
+    !/^\.\/assets\/exercise-animations\/[a-z0-9-]+-(male|female)\.webp$/.test(path)
+  ) {
+    return "";
+  }
+
+  return path;
+}
+
+function studioContent(name) {
+  const exercise = studioFind(name);
+  const animation = studioAnimation(name);
+  const images = exercise?.images?.flat || {};
+
+  const positions = [
+    images.start,
+    images.peak,
+    images.main
+  ].map(studioImage).filter(Boolean);
+
+  let visual = "";
+
+  if (animation) {
+    visual = `
+      <div class="studio-media">
+        <img
+          src="${studioEscape(animation)}"
+          alt="${studioEscape(name)} animated exercise demonstration"
+        >
+      </div>
+      <p class="studio-caption">
+        Licensed movement-specific demonstration.
+      </p>
+    `;
+  } else if (positions.length) {
+    visual = `
+      <div class="studio-positions">
+        ${positions.slice(0, 2).map((src, i) => `
+          <figure>
+            <img
+              src="${studioEscape(src)}"
+              alt="${studioEscape(name)} position ${i + 1}"
+              loading="lazy"
+            >
+            <figcaption>
+              ${i === 0 ? "Start position" : "Movement position"}
+            </figcaption>
+          </figure>
+        `).join("")}
+      </div>
+
+      <p class="studio-caption">
+        Exercise illustrations. A verified animation
+        is not yet available for this movement.
+      </p>
+    `;
+  } else {
+    visual = `
+      <div class="studio-placeholder">
+        ${exerciseStudio.status === "loading"
+          ? "Loading exercise references..."
+          : "No verified exercise demonstration available yet."}
+      </div>
+    `;
+  }
+
+  const instructions = Array.isArray(exercise?.instructions_en)
+    ? exercise.instructions_en
+    : [];
+
+  const tips = Array.isArray(exercise?.tips_en)
+    ? exercise.tips_en
+    : [];
+
+  return `
+    <section class="professional-studio">
+
+      <div class="studio-heading">
+        <div>
+          <span class="studio-eyebrow">EXERCISE STUDIO</span>
+          <h3>${studioEscape(name)}</h3>
+        </div>
+
+        <span class="studio-status">
+          ${animation
+            ? "ANIMATED"
+            : positions.length
+              ? "ILLUSTRATED"
+              : "NO MEDIA"}
+        </span>
+      </div>
+
+      ${visual}
+
+      ${instructions.length ? `
+        <h3>How to perform this exercise</h3>
+        <ol>
+          ${instructions.slice(0, 8).map(step =>
+            `<li>${studioEscape(step)}</li>`
+          ).join("")}
+        </ol>
+      ` : ""}
+
+      ${tips.length ? `
+        <h3>Technique tips</h3>
+        <ul>
+          ${tips.slice(0, 5).map(tip =>
+            `<li>${studioEscape(tip)}</li>`
+          ).join("")}
+        </ul>
+      ` : ""}
+
+      <p class="studio-credit">
+        Exercise references by
+        <a href="https://repdb.co/"
+           target="_blank"
+           rel="noopener noreferrer">RepDB</a>.
+        <a href="https://repdb.co/preview/"
+           target="_blank"
+           rel="noopener noreferrer">
+          View professional animation previews
+        </a>.
+      </p>
+    </section>
+  `;
+}
+
+const professionalStudioCSS = document.createElement("style");
+
+professionalStudioCSS.textContent = `
+.professional-studio {
+  background:var(--card,#fff);
+  border:1px solid var(--border,#ddd);
+  border-radius:18px;
+  padding:16px;
+  margin:16px 0;
+}
+
+.studio-heading {
+  display:flex;
+  justify-content:space-between;
+  gap:10px;
+  align-items:center;
+  margin-bottom:16px;
+}
+
+.studio-heading h3 {
+  font-size:21px;
+  margin:6px 0;
+}
+
+.studio-eyebrow {
+  font-size:10px;
+  font-weight:800;
+  letter-spacing:1px;
+  color:var(--accent,#2674ea);
+}
+
+.studio-status {
+  font-size:10px;
+  font-weight:800;
+  color:var(--accent,#2674ea);
+  padding:7px;
+  border:1px solid var(--accent,#2674ea);
+  border-radius:9px;
+}
+
+.studio-media,
+.studio-placeholder {
+  background:var(--soft,#f1f5fa);
+  border-radius:14px;
+  padding:12px;
+  text-align:center;
+}
+
+.studio-media img {
+  display:block;
+  width:100%;
+  max-height:380px;
+  object-fit:contain;
+}
+
+.studio-placeholder {
+  padding:45px 16px;
+  color:var(--muted,#64748b);
+}
+
+.studio-positions {
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:10px;
+}
+
+.studio-positions figure {
+  margin:0;
+  background:#f4f7fb;
+  border-radius:12px;
+  overflow:hidden;
+}
+
+.studio-positions img {
+  width:100%;
+  aspect-ratio:1;
+  object-fit:contain;
+  display:block;
+}
+
+.studio-positions figcaption {
+  color:#536277;
+  font-size:12px;
+  padding:8px;
+  text-align:center;
+}
+
+.studio-caption,
+.studio-credit {
+  font-size:12px;
+  color:var(--muted,#64748b);
+  line-height:1.5;
+}
+
+.professional-studio li {
+  margin:8px 0;
+  line-height:1.6;
+}
+
+.professional-studio a {
+  color:var(--accent,#2674ea);
+}
+`;
+
+document.head.appendChild(professionalStudioCSS);
+
+function updateProfessionalStudio() {
+  if (
+    typeof tab !== "string" ||
+    tab !== "exercises" ||
+    typeof detail !== "string" ||
+    !detail
+  ) {
+    return;
+  }
+
+  const backButton = document.querySelector(
+    'button[data-a="back"]'
+  );
+
+  if (!backButton) return;
+
+  document.querySelectorAll(".ms-card").forEach(
+    element => element.remove()
+  );
+
+  if (typeof msStop === "function") {
+    msStop();
+  }
+
+  document.querySelectorAll(".professional-studio").forEach(
+    element => element.remove()
+  );
+
+  backButton.insertAdjacentHTML(
+    "afterend",
+    studioContent(detail)
+  );
+}
+
+if (typeof draw === "function") {
+  const previousStudioDraw = draw;
+
+  draw = function(...args) {
+    previousStudioDraw(...args);
+    updateProfessionalStudio();
+  };
+}
+
+async function loadProfessionalStudio() {
+  const sources = [
+    "https://exercise-dataset.com/exercises.json",
+    "https://cdn.jsdelivr.net/gh/RepDB/exercise-dataset@main/exercises.json"
+  ];
+
+  for (const source of sources) {
+    try {
+      const response = await fetch(source);
+
+      if (!response.ok) continue;
+
+      const data = await response.json();
+
+      if (!Array.isArray(data.exercises)) continue;
+
+      for (const exercise of data.exercises) {
+        const key = studioNormalize(exercise.name_en);
+
+        if (key && !exerciseStudio.exercises.has(key)) {
+          exerciseStudio.exercises.set(key, exercise);
+        }
+      }
+
+      exerciseStudio.status = "ready";
+      break;
+    } catch (error) {
+      console.warn("Exercise catalog:", error);
+    }
+  }
+
+  if (exerciseStudio.status !== "ready") {
+    exerciseStudio.status = "unavailable";
+  }
+
+  try {
+    const response = await fetch(
+      "./assets/exercise-animations/manifest.json",
+      {cache:"no-store"}
+    );
+
+    if (response.ok) {
+      exerciseStudio.animations = await response.json();
+    }
+  } catch {
+    console.info("Professional animation files not installed yet.");
+  }
+
+  if (typeof draw === "function") {
+    draw();
+  }
+}
+
+loadProfessionalStudio();
 </script>
 <script src="./animations.js"></script
 </body>
