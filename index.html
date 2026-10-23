@@ -1,0 +1,312 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#10141d">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="RepLedger">
+<title>RepLedger - Gym Tracker</title>
+<style>
+:root{color-scheme:dark;--bg:#10141d;--card:#1b2230;--line:#2e394c;--text:#f5f7fc;--muted:#9eacc0;--accent:#52dac4}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:15px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+main{max-width:680px;margin:auto;padding:22px 16px 110px}
+h1{font-size:29px;margin:7px 0 5px}
+h2{font-size:21px;margin:24px 0 12px}
+h3{font-size:17px;margin:0 0 8px}
+p{line-height:1.5}
+.sub,.small{color:var(--muted)}
+.small{font-size:12px}
+.eyebrow{color:var(--accent);font-size:12px;letter-spacing:.12em;font-weight:800;text-transform:uppercase}
+.card{border:1px solid var(--line);border-radius:17px;padding:16px;background:var(--card);margin:11px 0}
+.row{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.row>div{min-width:0}
+.stack{display:grid;gap:8px}
+button,input,select{font:inherit}
+button{border:0;border-radius:11px;padding:11px 14px;background:var(--accent);color:#062421;font-weight:750;cursor:pointer}
+button.secondary{background:#303b4e;color:var(--text)}
+button.danger{background:#512d36;color:#ffe4e8}
+button.smallbtn{padding:7px 10px;font-size:13px}
+input{min-width:0;padding:11px;background:#111925;color:white;border:1px solid #475369;border-radius:10px;width:100%}
+.statgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.stat{background:var(--card);border-radius:13px;padding:14px 9px;text-align:center;border:1px solid var(--line)}
+.stat strong{display:block;font-size:23px;margin-bottom:5px}
+.stat span{font-size:11px;color:var(--muted)}
+.chips{display:flex;gap:7px;overflow:auto;padding-bottom:9px}
+.chips button{white-space:nowrap;padding:8px 12px}
+.chips .selected{background:var(--accent);color:#062421}
+.chips button:not(.selected){background:#303b4e;color:var(--text)}
+.badge{color:var(--accent);font-size:12px;font-weight:700}
+nav{position:fixed;bottom:0;left:0;right:0;background:#151b27;border-top:1px solid var(--line);display:flex;justify-content:center;padding:7px 3px max(9px,env(safe-area-inset-bottom));z-index:10}
+nav button{flex:1;max-width:135px;background:transparent;color:#9eacc0;font-size:11px;display:grid;justify-items:center;gap:4px;padding:8px 1px}
+nav button.active{color:var(--accent);background:#24333c}
+nav button b{font-size:19px}
+.setrow{display:grid;grid-template-columns:32px 1fr 1fr 44px;gap:7px;align-items:center;margin:8px 0}
+.setrow input{text-align:center;padding:10px 4px}
+.done{background:#225646!important;color:#bcffed!important}
+.activity{border-left:3px solid var(--accent);padding:5px 0 5px 12px;margin:12px 0}
+.notice{background:#153b39;border:1px solid #297265;color:#c4fff2;border-radius:12px;padding:12px;margin:12px 0}
+#rest{position:fixed;bottom:74px;left:50%;transform:translateX(-50%);z-index:11;background:#19483e;border:1px solid var(--accent);border-radius:14px;padding:10px 15px;display:none;align-items:center;gap:15px;box-shadow:0 10px 30px #0009;white-space:nowrap}
+#rest button{padding:6px 10px}
+.bar{height:7px;background:#334152;border-radius:9px;overflow:hidden}
+.bar i{display:block;background:var(--accent);height:100%}
+</style>
+</head>
+<body>
+<main id="app"></main>
+<div id="rest"><span id="resttext"></span><button class="secondary smallbtn" data-action="stop-timer">Stop</button></div>
+<nav id="nav"></nav>
+<script>
+const groups={
+Chest:['Barbell Bench Press','Dumbbell Bench Press','Incline Barbell Press','Incline Dumbbell Press','Decline Bench Press','Chest Fly','Cable Crossover','Push-Up'],
+Back:['Deadlift','Lat Pulldown','Pull-Up','Chin-Up','Seated Cable Row','Bent-Over Barbell Row','One-Arm Dumbbell Row','T-Bar Row','Straight-Arm Pulldown'],
+Shoulders:['Overhead Press','Seated Dumbbell Shoulder Press','Arnold Press','Lateral Raise','Cable Lateral Raise','Front Raise','Reverse Pec Deck','Face Pull'],
+Biceps:['Barbell Curl','Dumbbell Curl','Hammer Curl','Preacher Curl','Incline Dumbbell Curl','Cable Curl','Concentration Curl'],
+Triceps:['Triceps Pushdown','Rope Triceps Pushdown','Overhead Triceps Extension','Skull Crusher','Close-Grip Bench Press','Triceps Dip','Dumbbell Kickback'],
+Quads:['Barbell Back Squat','Front Squat','Leg Press','Hack Squat','Leg Extension','Bulgarian Split Squat','Walking Lunge'],
+Hamstrings:['Romanian Deadlift','Leg Curl','Seated Leg Curl','Stiff-Leg Deadlift','Good Morning','Nordic Curl'],
+Glutes:['Hip Thrust','Glute Bridge','Cable Kickback','Step-Up','Goblet Squat'],
+Calves:['Standing Calf Raise','Seated Calf Raise','Leg Press Calf Raise','Single-Leg Calf Raise'],
+Core:['Plank','Crunch','Hanging Leg Raise','Cable Crunch','Russian Twist','Ab Wheel Rollout','Bicycle Crunch','Reverse Crunch']
+};
+const baseExercises=Object.entries(groups).flatMap(([muscle,names])=>names.map(name=>({name,muscle})));
+const starter=[
+{name:'Push Day',exercises:['Barbell Bench Press','Incline Dumbbell Press','Seated Dumbbell Shoulder Press','Lateral Raise','Triceps Pushdown']},
+{name:'Pull Day',exercises:['Lat Pulldown','Seated Cable Row','One-Arm Dumbbell Row','Face Pull','Hammer Curl']},
+{name:'Leg Day',exercises:['Barbell Back Squat','Romanian Deadlift','Leg Press','Leg Curl','Standing Calf Raise']}
+];
+const KEY='repledger-free-v1';
+const fresh=()=>({workouts:[],active:null,routines:JSON.parse(JSON.stringify(starter)),custom:[],unit:'lb'});
+let db;
+try{db=JSON.parse(localStorage.getItem(KEY))||fresh()}catch(e){db=fresh()}
+if(!Array.isArray(db.workouts)||!Array.isArray(db.routines))db=fresh();
+db.custom ||= [];
+db.unit ||= 'lb';
+let tab='home',query='',muscleFilter='All',picker='',draft=null,timerEnd=0;
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const attr=s=>encodeURIComponent(s);
+const all=()=>[...baseExercises,...db.custom];
+function save(){try{localStorage.setItem(KEY,JSON.stringify(db))}catch(e){alert('Saving failed. Your device storage may be full.')}}
+function makeItem(name){return {name,sets:[{weight:0,reps:10,done:false},{weight:0,reps:10,done:false},{weight:0,reps:10,done:false}]}}
+function head(title,subtitle){return `<div class="eyebrow">RepLedger • Your personal gym</div><h1>${title}</h1><p class="sub">${subtitle}</p>`}
+const stamp=s=>new Date(s).toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'});
+const vol=w=>w.items.reduce((a,x)=>a+x.sets.reduce((b,s)=>b+(+s.weight||0)*(+s.reps||0),0),0);
+const doneSets=w=>w.items.reduce((a,x)=>a+x.sets.length,0);
+
+function home(){
+let count=db.workouts.length;
+let sets=db.workouts.reduce((a,w)=>a+doneSets(w),0);
+let week=db.workouts.filter(w=>Date.now()-new Date(w.ended).getTime()<7*86400000).length;
+return head('Your training hub','Track every rep. Get stronger over time.')+
+`<div class="statgrid">
+<div class="stat"><strong>${count}</strong><span>Workouts</span></div>
+<div class="stat"><strong>${sets}</strong><span>Sets logged</span></div>
+<div class="stat"><strong>${week}</strong><span>Last 7 days</span></div>
+</div>
+<div class="card"><h3>Ready to lift?</h3><p class="sub">${db.active?'Your workout is in progress.':'Start from scratch or select a routine.'}</p>
+<button data-action="${db.active?'go-workout':'start-empty'}">${db.active?'Continue workout':'Start empty workout'} →</button></div>
+<h2>Quick start routines</h2>`+
+db.routines.slice(0,4).map((r,i)=>`<div class="card row"><div><b>${esc(r.name)}</b><p class="small">${r.exercises.length} exercises</p></div><button data-action="start-routine" data-i="${i}">Start</button></div>`).join('')+
+`<h2>Recent workouts</h2>`+
+(db.workouts.length?db.workouts.slice(0,3).map(w=>`<div class="activity"><b>${esc(w.name)}</b><div class="small">${stamp(w.ended)} • ${doneSets(w)} sets</div></div>`).join(''):'<p class="sub">Finish your first workout to see progress here.</p>')+
+'<div class="notice">Training records are stored in this browser. Export a backup regularly.</div>';
+}
+
+function workout(){
+if(!db.active)return head('Workout','Start a workout to track weights, reps and rest.')+
+`<button data-action="start-empty">+ Start empty workout</button><h2>Your routines</h2>`+
+db.routines.map((r,i)=>`<div class="card row"><div><b>${esc(r.name)}</b><div class="small">${r.exercises.length} exercises</div></div><button data-action="start-routine" data-i="${i}">Start</button></div>`).join('');
+let w=db.active;
+return head(esc(w.name),'Log your sets. Tap the circle to mark a set complete.')+
+`<div class="row"><span class="badge">${w.items.length} exercises</span><button class="danger smallbtn" data-action="discard">Discard</button></div>`+
+w.items.map((x,i)=>`<div class="card">
+<div class="row"><h3>${esc(x.name)}</h3><button class="secondary smallbtn" data-action="remove-ex" data-i="${i}">Remove</button></div>
+<div class="small">SET &nbsp;&nbsp; WEIGHT (${db.unit}) &nbsp;&nbsp; REPS &nbsp;&nbsp; DONE</div>
+${x.sets.map((s,j)=>`<div class="setrow">
+<b>${j+1}</b>
+<input aria-label="Weight" type="number" step="0.5" min="0" data-edit="weight" data-i="${i}" data-j="${j}" value="${s.weight}">
+<input aria-label="Reps" type="number" min="0" data-edit="reps" data-i="${i}" data-j="${j}" value="${s.reps}">
+<button class="${s.done?'done':'secondary'}" data-action="toggle" data-i="${i}" data-j="${j}">${s.done?'✓':'○'}</button>
+</div>`).join('')}
+<button class="secondary smallbtn" data-action="add-set" data-i="${i}">+ Add set</button>
+</div>`).join('')+
+`<div class="stack"><button data-action="add-picker">+ Add exercise</button><button data-action="finish">✓ Finish workout</button></div>`;
+}
+
+function libraryCards(){
+let xs=all().filter(x=>(muscleFilter==='All'||x.muscle===muscleFilter)&&x.name.toLowerCase().includes(query.toLowerCase()));
+return `<div class="small">${xs.length} matching exercises</div>`+
+xs.map(x=>`<div class="card row"><div><b>${esc(x.name)}</b><div class="small">${esc(x.muscle)}</div></div><button class="smallbtn" data-action="choose" data-name="${attr(x.name)}">${picker?'Add':'+ Workout'}</button></div>`).join('')+
+(xs.length?'':'<p class="sub">No matches. Try another search.</p>');
+}
+
+function exercises(){
+let pre=picker==='routine'?
+`<div class="notice"><b>Building routine: ${esc(draft.name)}</b><div>${draft.exercises.length} chosen</div>
+<div class="row" style="margin-top:10px"><button data-action="save-routine">Save routine</button><button class="secondary" data-action="cancel-picker">Cancel</button></div></div>`:
+picker==='workout'?`<div class="notice">Choose an exercise to add to your active workout. <button class="secondary smallbtn" data-action="cancel-picker">Cancel</button></div>`:'';
+return head('Exercises',`${all().length} exercises available. Search by name or filter by muscle.`)+pre+
+`<input id="search" aria-label="Search exercises" placeholder="Search exercises (e.g. bench)" value="${esc(query)}">
+<div class="chips" style="margin-top:12px">${['All',...Object.keys(groups)].map(g=>`<button data-action="filter" data-name="${attr(g)}" class="${muscleFilter===g?'selected':''}">${g}</button>`).join('')}</div>
+<button class="secondary smallbtn" data-action="custom">+ Create custom exercise</button>
+<div id="results">${libraryCards()}</div>`;
+}
+
+function routines(){
+return head('Routines','Unlimited reusable workout plans.')+
+`<button data-action="new-routine">+ Create new routine</button>`+
+db.routines.map((r,i)=>`<div class="card"><div class="row"><h3>${esc(r.name)}</h3><button data-action="start-routine" data-i="${i}">Start</button></div>
+<p class="small">${r.exercises.map(esc).join(' • ')}</p>
+<button class="secondary smallbtn" data-action="delete-routine" data-i="${i}">Delete routine</button></div>`).join('');
+}
+
+function history(){
+const best=new Map();
+db.workouts.forEach(w=>w.items.forEach(x=>x.sets.forEach(s=>{if(+s.weight>(best.get(x.name)||0))best.set(x.name,+s.weight)})));
+let prs=[...best].sort((a,b)=>b[1]-a[1]).slice(0,8);
+return head('Progress & history','Review your sessions and your strongest lifts.')+
+`<div class="card"><h3>Workout history</h3>`+
+(db.workouts.length?db.workouts.map((w,i)=>`<div class="activity row"><div><b>${esc(w.name)}</b>
+<div class="small">${stamp(w.ended)} • ${doneSets(w)} sets • ${Math.round(vol(w)).toLocaleString()} ${db.unit} volume</div>
+<div class="small">${w.items.map(x=>esc(x.name)).join(', ')}</div></div>
+<button class="danger smallbtn" data-action="delete-history" data-i="${i}">×</button></div>`).join(''):'<p class="sub">No finished workouts yet.</p>')+
+`</div><div class="card"><h3>Personal records (heaviest set)</h3>`+
+(prs.length?prs.map(([name,weight])=>`<div style="padding:8px 0"><div class="row"><span>${esc(name)}</span><b>${weight} ${db.unit}</b></div>
+<div class="bar" style="margin-top:6px"><i style="width:${Math.round(weight/prs[0][1]*100)}%"></i></div></div>`).join(''):'<p class="sub">Finish some weighted sets to see records.</p>')+
+`</div><div class="card"><h3>Data & settings</h3>
+<p class="small">Changing the weight unit does not convert numbers already recorded.</p>
+<div class="row"><button class="secondary smallbtn" data-action="unit">Unit: ${db.unit}</button>
+<button class="secondary smallbtn" data-action="export">Export backup</button></div>
+<p class="small">Import a previously exported JSON backup:</p>
+<input type="file" id="import" accept="application/json,.json"></div>`;
+}
+
+function render(){
+const pages={home,workout,exercises,routines,history};
+$('app').innerHTML=pages[tab]();
+$('nav').innerHTML=[
+['home','⌂','Home'],
+['workout','◆','Workout'],
+['exercises','▤','Exercises'],
+['routines','▦','Routines'],
+['history','↗','Progress']
+].map(([id,ico,label])=>`<button data-tab="${id}" class="${tab===id?'active':''}"><b>${ico}</b>${label}</button>`).join('');
+}
+
+function begin(name,names){
+if(db.active&&!confirm('Discard the workout already in progress?'))return;
+db.active={name,started:new Date().toISOString(),items:names.map(makeItem)};
+picker='';save();tab='workout';render();
+}
+function rest(seconds){timerEnd=Date.now()+seconds*1000;tick()}
+function tick(){
+const n=Math.max(0,Math.ceil((timerEnd-Date.now())/1000));
+$('rest').style.display=n?'flex':'none';
+$('resttext').textContent=`Rest ${Math.floor(n/60)}:${String(n%60).padStart(2,'0')}`;
+}
+setInterval(tick,1000);
+
+document.addEventListener('click',e=>{
+const b=e.target.closest('button');
+if(!b)return;
+if(b.dataset.tab){
+tab=b.dataset.tab;picker='';draft=null;query='';muscleFilter='All';render();return;
+}
+const a=b.dataset.action,i=Number(b.dataset.i),j=Number(b.dataset.j),name=decodeURIComponent(b.dataset.name||'');
+if(a==='start-empty')begin('New Workout',[]);
+if(a==='start-routine'){const r=db.routines[i];if(r)begin(r.name,r.exercises)}
+if(a==='go-workout'){tab='workout';render()}
+if(a==='discard'&&confirm('Discard this unfinished workout?')){db.active=null;save();render()}
+if(a==='remove-ex'){db.active.items.splice(i,1);save();render()}
+if(a==='add-set'){
+const x=db.active.items[i],prev=x.sets.at(-1);
+x.sets.push({weight:prev?.weight||0,reps:prev?.reps||10,done:false});
+save();render();
+}
+if(a==='toggle'){
+const s=db.active.items[i].sets[j];
+s.done=!s.done;save();
+if(s.done)rest(90);
+render();
+}
+if(a==='add-picker'){picker='workout';tab='exercises';query='';muscleFilter='All';render()}
+if(a==='finish'){
+const w=db.active;
+if(!w)return;
+let items=w.items.map(x=>({...x,sets:x.sets.filter(s=>s.done)})).filter(x=>x.sets.length);
+if(!items.length){alert('Mark at least one set complete first.');return}
+db.workouts.unshift({name:w.name,started:w.started,ended:new Date().toISOString(),items});
+db.active=null;timerEnd=0;save();tab='history';render();
+}
+if(a==='filter'){muscleFilter=name;render()}
+if(a==='choose'){
+if(picker==='routine'){
+if(!draft.exercises.includes(name))draft.exercises.push(name);
+render();
+}else{
+if(!db.active)db.active={name:'New Workout',started:new Date().toISOString(),items:[]};
+db.active.items.push(makeItem(name));picker='';save();tab='workout';render();
+}}
+if(a==='custom'){
+const n=prompt('Name your custom exercise:');
+if(!n?.trim())return;
+const m=prompt('Muscle group (e.g. Chest):','Custom')||'Custom';
+if(all().some(x=>x.name.toLowerCase()===n.trim().toLowerCase())){alert('That exercise already exists.');return}
+db.custom.push({name:n.trim(),muscle:m.trim()||'Custom'});
+save();query=n.trim();muscleFilter='All';render();
+}
+if(a==='new-routine'){
+const n=prompt('Name your routine:','My Workout');
+if(!n?.trim())return;
+draft={name:n.trim(),exercises:[]};
+picker='routine';tab='exercises';query='';muscleFilter='All';render();
+}
+if(a==='save-routine'){
+if(!draft?.exercises.length){alert('Add at least one exercise first.');return}
+db.routines.push(draft);draft=null;picker='';save();tab='routines';render();
+}
+if(a==='cancel-picker'){
+const was=picker;picker='';draft=null;
+tab=was==='routine'?'routines':'workout';render();
+}
+if(a==='delete-routine'&&confirm('Delete this routine?')){
+db.routines.splice(i,1);save();render();
+}
+if(a==='delete-history'&&confirm('Delete this workout from history?')){
+db.workouts.splice(i,1);save();render();
+}
+if(a==='unit'){db.unit=db.unit==='lb'?'kg':'lb';save();render()}
+if(a==='stop-timer'){timerEnd=0;tick()}
+if(a==='export'){
+const blob=new Blob([JSON.stringify(db,null,2)],{type:'application/json'});
+const url=URL.createObjectURL(blob),a=document.createElement('a');
+a.href=url;a.download='repledger-backup.json';a.click();
+setTimeout(()=>URL.revokeObjectURL(url),1000);
+}
+});
+
+document.addEventListener('input',e=>{
+const x=e.target;
+if(x.id==='search'){query=x.value;$('results').innerHTML=libraryCards()}
+if(x.dataset.edit&&db.active){
+const s=db.active.items[+x.dataset.i]?.sets[+x.dataset.j];
+if(s){s[x.dataset.edit]=Math.max(0,Number(x.value)||0);save()}
+}
+});
+document.addEventListener('change',async e=>{
+if(e.target.id!=='import'||!e.target.files[0])return;
+try{
+const data=JSON.parse(await e.target.files[0].text());
+if(!Array.isArray(data.workouts)||!Array.isArray(data.routines))throw Error('Invalid backup');
+if(confirm('Replace all your local app data with this backup?')){
+db={...fresh(),...data};save();render();
+}
+}catch(err){alert('Could not import this backup file.')}
+});
+render();
+</script>
+</body>
+</html>
